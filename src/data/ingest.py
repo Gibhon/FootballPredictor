@@ -1,3 +1,9 @@
+"""Kaggle dataset ingestion and validation module.
+
+Handles downloading raw game data via the Kaggle API, caching it locally,
+and enforcing strict data integrity checks before downstream processing.
+"""
+
 import pandas as pd
 from pathlib import Path
 import os
@@ -21,6 +27,11 @@ FILE_PATH = RAW_DIR / FILENAME
 
 
 def load_raw_data() -> pd.DataFrame:
+    """Fetch raw game data from Kaggle or load it from local cache if present.
+
+    Attempts Kaggle API authentication to download the file if not already 
+    cached at FILE_PATH. Handles authentication and runtime exceptions gracefully.
+    """
     if os.path.exists(FILE_PATH):
         print(f"📦 Data already available locally at '{FILE_PATH}'. Skipping download.")
         df = load_df(FILE_PATH)
@@ -55,6 +66,9 @@ def load_raw_data() -> pd.DataFrame:
 
 
 def validate_raw(df: pd.DataFrame) -> None:
+    """Validate dataset schema integrity, checking for missing required columns, 
+    null values, and duplicate primary key records.
+    """
     if df.empty:
         raise ValueError("Fetched data is empty!!!")
 
