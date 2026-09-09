@@ -10,6 +10,7 @@ import pandas as pd
 
 
 def filter_domestic_league(df: pd.DataFrame) -> pd.DataFrame:
+    print("-" * 100)
     filtered_data = df[df["competition_type"] == "domestic_league"].copy()
 
     print("Data has been filtered")
@@ -23,6 +24,7 @@ def derive_result(df: pd.DataFrame) -> pd.DataFrame:
 
     dropping rows where outcome cannot be resolved.
     """
+    print("-" * 100)
     conditions = [
         df["home_club_goals"] > df["away_club_goals"],
         df["home_club_goals"] == df["away_club_goals"],
@@ -39,7 +41,34 @@ def derive_result(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def parse_date(df: pd.DataFrame) -> pd.DataFrame:
+    print("-" * 100)
+    df["date"] = pd.to_datetime(df["date"])
+    print(f'Datatype of "date": {df["date"].dtype}')
+
+    return df
+
+
+def add_numeric_round(df: pd.DataFrame) -> pd.DataFrame:
+    """Extract numeric matchday digits from the 'round' string column."""
+    print("-" * 100)
+    df["matchday"] = df["round"].str.extract(r"(\d+)")
+
+    invalid_outputs = df["matchday"].isna().sum()
+    print(f"Invalid_outputs: {invalid_outputs}")
+    print(f"Shape before dropna(matchday): {df.shape}")
+
+    df = df.dropna(subset=["matchday"])
+    df["matchday"] = df["matchday"].astype(int)
+
+    print(f"Shape after dropna(matchday): {df.shape}")
+    print("Column 'matchday' has been successfully created!!!")
+
+    return df
+
+
 def select_features(df: pd.DataFrame) -> pd.DataFrame:
+    print("-" * 100)
     essential_columns = [
         "game_id",
         "competition_id",
@@ -70,30 +99,9 @@ def select_features(df: pd.DataFrame) -> pd.DataFrame:
     return clean_df
 
 
-def parse_date(df: pd.DataFrame) -> pd.DataFrame:
-    df["date"] = pd.to_datetime(df["date"])
-    print(f'Datatype of "date": {df["date"].dtype}')
-
-    return df
-
-
-def add_numeric_round(df: pd.DataFrame) -> pd.DataFrame:
-    """Extract numeric matchday digits from the 'round' string column."""
-    df["matchday"] = df["round"].str.extract(r"(\d+)")
-
-    invalid_outputs = df["matchday"].isna().sum()
-    print(f"Invalid_outputs: {invalid_outputs}")
-
-    df = df.dropna(subset=["matchday"])
-    df["matchday"] = df["matchday"].astype(int)
-
-    print("Column 'matchday' has been successfully created!!!")
-
-    return df
-
-
 def save_cleandf(df: pd.DataFrame, filepath: Path) -> None:
     """Save clean DataFrame to disk, prompting user confirmation if file exists."""
+    print("-" * 100)
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     if filepath.exists():
