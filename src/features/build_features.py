@@ -54,9 +54,7 @@ def build_team_match_log(df: pd.DataFrame) -> pd.DataFrame:
     away_timeline["is_home"] = 0
 
     timeline = pd.concat([home_timeline, away_timeline], ignore_index=True)
-    timeline = timeline.sort_values(by=["club_id", "date"]).reset_index(
-        drop=True
-    )
+    timeline = timeline.sort_values(by=["club_id", "date"]).reset_index(drop=True)
 
     conditions_result = [
         timeline["goals_for"] > timeline["goals_against"],
@@ -71,15 +69,11 @@ def build_team_match_log(df: pd.DataFrame) -> pd.DataFrame:
     timeline["result"] = np.select(
         conditions_result, ["W", "D", "L"], default="UNKNOWN"
     )
-    timeline["goals_diff"] = (
-        timeline["goals_for"] - timeline["goals_against"]
-    )
+    timeline["goals_diff"] = timeline["goals_for"] - timeline["goals_against"]
 
     print(f"The shape of timeline is {timeline.shape}")
     print(f"The datatype of date column is {timeline['date'].dtype}")
-    print(
-        f"The datatype of points_earned column is {timeline['points_earned'].dtype}"
-    )
+    print(f"The datatype of points_earned column is {timeline['points_earned'].dtype}")
 
     return timeline
 
@@ -91,9 +85,7 @@ def add_rolling_form(team_log: pd.DataFrame, window: int = 15) -> pd.DataFrame:
     features reflect past form only.
     """
     if "date" in team_log.columns:
-        team_log = team_log.sort_values(by=["club_id", "date"]).reset_index(
-            drop=True
-        )
+        team_log = team_log.sort_values(by=["club_id", "date"]).reset_index(drop=True)
 
     grouped = team_log.groupby("club_id")
 
@@ -163,6 +155,68 @@ def merge_rolling_features(
     return df
 
 
+import pandas as pd
+
+
+def fix_position_leak(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.sort_values(["season", "competition_id", "date"]).reset_index(drop=True)
+
+    # 1. Melt/build a unified timeline of every game per club
+    home_df = df[
+        [
+            "game_id",
+            "season",
+            "competition_id",
+            "date",
+            "home_club_id",
+            "home_club_position",
+        ]
+    ].copy()
+    home_df.rename(
+        columns={"home_club_id": "club_id", "home_club_position": "post_game_pos"},
+        inplace=True,
+    )
+
+    away_df = df[
+        [
+            "game_id",
+            "season",
+            "competition_id",
+            "date",
+            "away_club_id",
+            "away_club_position",
+        ]
+    ].copy()
+    away_df.rename(
+        columns={"away_club_id": "club_id", "away_club_position": "post_game_pos"},
+        inplace=True,
+    )
+
+    timeline = pd.concat([home_df, away_df]).sort_values(["season", "club_id", "date"])
+
+    # 2. Shift position by 1 game per team per season
+    # The position prior to game N is the post-game position from game N-1
+    timeline["pre_game_pos"] = timeline.groupby(["season", "club_id"])[
+        "post_game_pos"
+    ].shift(1)
+
+    # 3. Merge pre-game positions back into original dataframe
+    home_pre = timeline[["game_id", "club_id", "pre_game_pos"]].rename(
+        columns={"club_id": "home_club_id", "pre_game_pos": "home_club_position_pre"}
+    )
+    away_pre = timeline[["game_id", "club_id", "pre_game_pos"]].rename(
+        columns={"club_id": "away_club_id", "pre_game_pos": "away_club_position_pre"}
+    )
+
+    df = df.merge(home_pre, on=["game_id", "home_club_id"], how="left")
+    df = df.merge(away_pre, on=["game_id", "away_club_id"], how="left")
+
+    # 4. Drop leaking post-game positions
+    df = df.drop(columns=["home_club_position", "away_club_position"])
+
+    return df
+
+
 def main():
     processed_data_path = (
         Path(__file__).resolve().parent.parent.parent / "data" / "processed"
@@ -174,7 +228,9 @@ def main():
     clean_data = csv_reader(clean_data_path)
     timeline = build_team_match_log(clean_data)
     timeline_with_form = add_rolling_form(timeline, window=15)
-    final_df = merge_rolling_features(clean_data, timeline_with_form, window=15)
+    merged_df = merge_rolling_features(clean_data, timeline_with_form, window=15)
+    final_df = fix_position_leak(merged_df)
+
 
     final_df.to_csv(feature_engineered_data_path, index=False)
     print("Data has been successfully processed and saved to featured.csv")
