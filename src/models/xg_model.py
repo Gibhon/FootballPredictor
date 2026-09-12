@@ -1,12 +1,30 @@
+"""
+XGBoost Model Training and Evaluation Pipeline.
+
+This module loads processed training, validation, and test datasets, trains
+an XGBoost multiclass classifier with early stopping, and evaluates performance
+using Log Loss, Brier Score, Accuracy, and confusion matrices.
+"""
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
 import xgboost as xgb
-from sklearn.metrics import confusion_matrix, log_loss, accuracy_score, classification_report
+from sklearn.metrics import (
+    confusion_matrix,
+    log_loss,
+    accuracy_score,
+    classification_report,
+)
+
 
 def multiclass_brier_score(y_true, y_prob):
+    """
+    Calculates the multi-class Brier score using one-hot encoded ground truth targets.
+    """
     y_true_onehot = np.eye(y_prob.shape[1])[y_true]
     return np.mean(np.sum((y_prob - y_true_onehot) ** 2, axis=1))
+
 
 def prep_data():
     processed_dir = Path(__file__).parent.parent.parent / "data" / "processed"
@@ -31,9 +49,8 @@ def train_xgb(X_train, y_train, X_val, y_val):
         "subsample": 0.8,
         "colsample_bytree": 0.8,
         "random_state": 42,
-        "n_estimators": 500
+        "n_estimators": 500,
     }
-
     model = xgb.XGBClassifier(**model_params, early_stopping_rounds=30)
     model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=50)
 
@@ -60,7 +77,14 @@ def evaluate_xgb(model, X, y):
     print(confusion_matrix(y, predictions))
 
     print("\nClassification Report:")
-    print(classification_report(y, predictions, target_names=["Away (0)", "Draw (1)", "Home (2)"], zero_division=0))
+    print(
+        classification_report(
+            y,
+            predictions,
+            target_names=["Away (0)", "Draw (1)", "Home (2)"],
+            zero_division=0,
+        )
+    )
 
     return loss, brier, acc
 
