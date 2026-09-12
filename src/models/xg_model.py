@@ -65,6 +65,8 @@ def evaluate_xgb(model, X, y):
     predictions = model.predict(X)
     probabilities = model.predict_proba(X)
 
+    print(probabilities[:5, :])
+
     loss = log_loss(y, probabilities)
     brier = multiclass_brier_score(y, probabilities)
     acc = accuracy_score(y, predictions)

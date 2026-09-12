@@ -1,7 +1,20 @@
-[0]     validation_0-mlogloss:1.06431   validation_0-merror:0.55588
-[50]    validation_0-mlogloss:0.98745   validation_0-merror:0.47472
-[100]   validation_0-mlogloss:0.98314   validation_0-merror:0.47382
-[114]   validation_0-mlogloss:0.98304   validation_0-merror:0.47370
+============================================================
+DUMMY CLASSIFIER BASELINE EVALUATION RESULTS
+============================================================
+
+--- Probabilistic Metrics ---
+Log-Loss           : 1.0699
+Multi-class Brier  : 0.6470
+
+--- Summary Metrics ---
+Accuracy           : 0.4441 (44.41%)
+
+--- Confusion Matrix ---
+[[   0    0 2675]
+ [   0    0 2229]
+ [   0    0 3918]]
+
+
 
 --- Validation Set Evaluation ---
 ============================================================
