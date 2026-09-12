@@ -1,0 +1,2 @@
+> **Model Evaluation Note:**  
+> The model rarely predicts draw via `argmax`, but assigns plausible probability mass (~20–30%) to draw outcomes consistent with base rate — evaluated via log-loss/Brier rather than accuracy for this reason.
