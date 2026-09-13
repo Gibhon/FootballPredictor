@@ -40,21 +40,6 @@ def load_match_data(path):
     ]
     df.drop(columns=unneccessary_columns, inplace=True)
 
-    new_order = [
-        "date",
-        "matchday",
-        "home_club_position_pre",
-        "away_club_position_pre",
-        "home_avg_goals_for_l15",
-        "home_avg_goals_against_l15",
-        "home_avg_points_earned_l15",
-        "away_avg_goals_for_l15",
-        "away_avg_goals_against_l15",
-        "away_avg_points_earned_l15",
-        "result",
-    ]
-    df = df.reindex(columns=new_order)
-
     df = map_result(df)
 
     print("Columns after dropping unneccessary columns:")
@@ -118,6 +103,7 @@ def time_based_split(df, train_frac=0.7, val_frac=0.15):
 
 def prep_and_save_data(dfs, output_dir):
     print("-" * 150)
+    total_len = 0
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
@@ -131,6 +117,7 @@ def prep_and_save_data(dfs, output_dir):
         df.drop(columns=cols_to_drop, inplace=True)
 
         print(f"Length before dropping NA: {len(df)}")
+        total_len +=len(df)
         df.dropna(inplace=True)
         print(f"Length after dropping NA: {len(df)}")
 
@@ -140,6 +127,7 @@ def prep_and_save_data(dfs, output_dir):
         print(f"Saving data to {file_path}...")
         df.to_csv(file_path, index=False)
         print(f"Data saved to {file_path}\n")
+    print(f"Total rows of Data: {total_len}")
 
 
 def main():
