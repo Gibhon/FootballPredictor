@@ -1,75 +1,83 @@
-"""
-Baseline Model Evaluation Module for Football Match Outcome Prediction.
-
-This module loads preprocessed train and validation datasets to evaluate a dummy
-classifier baseline (prior-based probability matching). It computes probabilistic
-metrics like Log-Loss and Multi-class Brier Score along with standard classification outputs.
-"""
+"""Baseline Model Evaluation Module for Football Match Outcome Prediction."""
 
 from pathlib import Path
-import pandas as pd
+import sys
 import numpy as np
+import pandas as pd
 from sklearn.dummy import DummyClassifier
-from sklearn.metrics import (
-    log_loss,
-    accuracy_score,
-    classification_report,
-    confusion_matrix,
+
+# Resolve project root and add to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# use absolute package imports
+from src.models.xg_model import (
+    evaluate_xgb,
+    get_all_aucs,
+    multiclass_brier_score,
+    plot_reliability,
+    prep_data,
 )
 
 
-def multiclass_brier_score(y_true, y_prob):
-    """
-    Calculates the multi-class Brier score using one-hot encoded ground truth targets.
-    """
-    y_true_one_hot = np.eye(y_prob.shape[1])[y_true]
-    return np.mean(np.sum((y_prob - y_true_one_hot) ** 2, axis=1))
+def evaluate_baseline() -> None:
+    # Load prepared feature datasets
+    train_X, train_y, val_X, val_y, test_X, test_y, _ = prep_data()
 
-
-def evaluate_baseline(data_dir):
-    data_path = Path(data_dir)
-
-    train_df = pd.read_csv(data_path / "train_set.csv")
-    val_df = pd.read_csv(data_path / "val_set.csv")
-
-    X_train, y_train = train_df.drop(columns=["result"]), train_df["result"]
-    X_val, y_val = val_df.drop(columns=["result"]), val_df["result"]
-
+    # Fit dummy classifier using empirical class prior distributions
     dummy = DummyClassifier(strategy="prior")
-    dummy.fit(X_train, y_train)
+    dummy.fit(train_X, train_y)
 
-    y_pred = dummy.predict(X_val)
-    y_prob = dummy.predict_proba(X_val)
+    # Compute predictions and probabilities across splits
+    train_probs = dummy.predict_proba(train_X)
+    train_preds = dummy.predict(train_X)
+    train_loss = float(evaluate_xgb(dummy, train_X, train_y)[0])
+    train_brier = multiclass_brier_score(train_y, train_probs)
+    train_acc = float(np.mean(train_preds == train_y))
 
-    loss = log_loss(y_val, y_prob)
-    brier = multiclass_brier_score(y_val, y_prob)
-    acc = accuracy_score(y_val, y_pred)
+    val_loss, val_brier, val_acc, val_probs = evaluate_xgb(
+        dummy, val_X, val_y, split_name="Dummy Baseline (Val Set)"
+    )
+    test_loss, test_brier, test_acc, test_probs = evaluate_xgb(
+        dummy, test_X, test_y, split_name="Dummy Baseline (Test Set)"
+    )
 
-    print("=" * 60)
-    print("DUMMY CLASSIFIER BASELINE EVALUATION RESULTS")
-    print("=" * 60)
+    # Compute class-wise AUC scores across splits
+    train_auc_away, train_auc_draw, train_auc_home = get_all_aucs(train_y, train_probs)
+    val_auc_away, val_auc_draw, val_auc_home = get_all_aucs(val_y, val_probs)
+    test_auc_away, test_auc_draw, test_auc_home = get_all_aucs(test_y, test_probs)
 
-    print("\n--- Probabilistic Metrics ---")
-    print(f"Log-Loss           : {loss:.4f}")
-    print(f"Multi-class Brier  : {brier:.4f}")
+    # Construct overall summary comparison table
+    summary_data = {
+        "split": ["train", "val", "test"],
+        "acc": [train_acc, val_acc, test_acc],
+        "brier": [train_brier, val_brier, test_brier],
+        "logloss": [train_loss, val_loss, test_loss],
+        "auc(draw)": [train_auc_draw, val_auc_draw, test_auc_draw],
+        "auc(home)": [train_auc_home, val_auc_home, test_auc_home],
+        "auc(away)": [train_auc_away, val_auc_away, test_auc_away],
+    }
 
-    print("\n--- Summary Metrics ---")
-    print(f"Accuracy           : {acc:.4f} ({acc * 100:.2f}%)")
+    df_metrics = pd.DataFrame(summary_data).set_index("split")
 
-    print("\n--- Confusion Matrix ---")
-    print(confusion_matrix(y_val, y_pred))
+    print("\n==================== DUMMY BASELINE PERFORMANCE SUMMARY ====================")
+    print(df_metrics.to_string(float_format=lambda x: f"{x:.4f}"))
+    print("============================================================================\n")
 
-    print("\n--- Detailed Classification Report ---")
-    print(
-        classification_report(
-            y_val,
-            y_pred,
-            target_names=["Away (0)", "Draw (1)", "Home (2)"],
-            zero_division=0,
-        )
+    # Export reliability curves for dummy baseline
+    reports_dir = PROJECT_ROOT / "reports" / "figures"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    class_labels = ["Away (A)", "Draw (D)", "Home (H)"]
+
+    plot_reliability(
+        y_true=test_y,
+        proba=test_probs,
+        class_names=class_labels,
+        out_path=reports_dir / "dummy_baseline_reliability_curves.png",
+        n_bins=10,
     )
 
 
 if __name__ == "__main__":
-    processed_dir = Path(__file__).parent.parent.parent / "data" / "processed"
-    evaluate_baseline(processed_dir)
+    evaluate_baseline()
